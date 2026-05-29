@@ -22,7 +22,9 @@ queues = {}
 YDL_OPTIONS = {
     "format": "bestaudio/best",
     "quiet": True,
-    "noplaylist": True
+    "noplaylist": True,
+    "extract_flat": False,
+    "cookiefile": "cookies.txt"
 }
 
 FFMPEG_OPTIONS = {
