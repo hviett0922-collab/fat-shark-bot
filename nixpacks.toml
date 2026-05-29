@@ -1,7 +1,5 @@
-```toml
 [phases.setup]
 nixPkgs = ["python313", "ffmpeg"]
 
 [start]
 cmd = "python bot.py"
-```
