@@ -1,15 +1,15 @@
-python
 import discord
 from discord.ext import commands
 from discord import app_commands
 import yt_dlp
 import asyncio
 
-TOKEN = "YOUR_BOT_TOKEN"
+TOKEN = "MTUwOTcxMDcyOTY4OTgyOTQ5Nw.G0QfYp.pzrkei1DsNiiuZZ0zDRTwf2wFpxHMMBRqb3DHM"
 
 intents = discord.Intents.default()
 intents.message_content = True
 intents.voice_states = True
+intents.guilds = True
 
 bot = commands.Bot(
     command_prefix="!",
@@ -18,39 +18,46 @@ bot = commands.Bot(
 
 queues = {}
 
-FFMPEG_OPTIONS = {
-    "options": "-vn"
-}
-
 YDL_OPTIONS = {
     "format": "bestaudio/best",
-    "quiet": True
+    "quiet": True,
+    "noplaylist": True
+}
+
+FFMPEG_OPTIONS = {
+    "options": "-vn"
 }
 
 
 class MusicControls(discord.ui.View):
 
-    def __init__(self, vc, guild_id, title):
+    def __init__(
+        self,
+        vc,
+        guild_id
+    ):
+
         super().__init__(timeout=None)
+
         self.vc = vc
         self.guild_id = guild_id
-        self.title = title
 
     @discord.ui.button(
         label="Pause",
         style=discord.ButtonStyle.gray
     )
-    async def pause(
+    async def pause_button(
         self,
         interaction: discord.Interaction,
         button: discord.ui.Button
     ):
 
         if self.vc.is_playing():
+
             self.vc.pause()
 
             await interaction.response.send_message(
-                "⏸️ Đã pause",
+                "⏸️ Paused",
                 ephemeral=True
             )
 
@@ -58,17 +65,70 @@ class MusicControls(discord.ui.View):
         label="Resume",
         style=discord.ButtonStyle.green
     )
-    async def resume(
+    async def resume_button(
         self,
         interaction: discord.Interaction,
         button: discord.ui.Button
     ):
 
         if self.vc.is_paused():
+
             self.vc.resume()
 
             await interaction.response.send_message(
-                "▶️ Đã resume",
+                "▶️ Resumed",
+                ephemeral=True
+            )
+
+    @discord.ui.button(
+        label="Vol +",
+        style=discord.ButtonStyle.blurple
+    )
+    async def volume_up(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button
+    ):
+
+        if hasattr(self.vc.source, "volume"):
+
+            self.vc.source.volume = min(
+                self.vc.source.volume + 0.1,
+                2.0
+            )
+
+            volume = int(
+                self.vc.source.volume * 100
+            )
+
+            await interaction.response.send_message(
+                f"🔊 Volume: {volume}%",
+                ephemeral=True
+            )
+
+    @discord.ui.button(
+        label="Vol -",
+        style=discord.ButtonStyle.red
+    )
+    async def volume_down(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button
+    ):
+
+        if hasattr(self.vc.source, "volume"):
+
+            self.vc.source.volume = max(
+                self.vc.source.volume - 0.1,
+                0.0
+            )
+
+            volume = int(
+                self.vc.source.volume * 100
+            )
+
+            await interaction.response.send_message(
+                f"🔉 Volume: {volume}%",
                 ephemeral=True
             )
 
@@ -76,38 +136,39 @@ class MusicControls(discord.ui.View):
         label="Skip",
         style=discord.ButtonStyle.blurple
     )
-    async def skip(
+    async def skip_button(
         self,
         interaction: discord.Interaction,
         button: discord.ui.Button
     ):
 
         if self.vc.is_playing():
+
             self.vc.stop()
 
             await interaction.response.send_message(
-                "⏭️ Đã skip",
+                "⏭️ Skipped",
                 ephemeral=True
             )
 
     @discord.ui.button(
         label="Stop",
-        style=discord.ButtonStyle.red
+        style=discord.ButtonStyle.danger
     )
-    async def stop(
+    async def stop_button(
         self,
         interaction: discord.Interaction,
         button: discord.ui.Button
     ):
 
-        self.vc.stop()
-
         queues[self.guild_id] = []
+
+        self.vc.stop()
 
         await self.vc.disconnect()
 
         await interaction.response.send_message(
-            "⏹️ Đã dừng nhạc",
+            "🛑 Music Stopped",
             ephemeral=True
         )
 
@@ -127,18 +188,24 @@ async def play_next(guild_id):
     if guild_id not in queues:
         return
 
-    if len(queues[guild_id]) > 0:
-
-        queues[guild_id].pop(0)
-
     if len(queues[guild_id]) == 0:
 
         await vc.disconnect()
+
         return
 
-    next_song = queues[guild_id][0]
+    song = queues[guild_id].pop(0)
 
-    def after(error):
+    source = discord.PCMVolumeTransformer(
+        discord.FFmpegPCMAudio(
+            song["url"],
+            **FFMPEG_OPTIONS
+        )
+    )
+
+    source.volume = 0.5
+
+    def after_play(error):
 
         fut = play_next(guild_id)
 
@@ -147,32 +214,16 @@ async def play_next(guild_id):
             bot.loop
         )
 
-    source = discord.PCMVolumeTransformer(
-        discord.FFmpegPCMAudio(
-            next_song["url"],
-            **FFMPEG_OPTIONS
-        ),
-        volume=0.8
-    )
-
     vc.play(
         source,
-        after=after
+        after=after_play
     )
 
 
 @bot.event
 async def on_ready():
 
-    try:
-
-        synced = await bot.tree.sync()
-
-        print(f"✅ Synced {len(synced)} commands")
-
-    except Exception as e:
-
-        print(e)
+    await bot.tree.sync()
 
     print(f"✅ {bot.user} online")
 
@@ -197,6 +248,7 @@ async def play(
             "❌ Bạn chưa vào voice",
             ephemeral=True
         )
+
         return
 
     voice_channel = interaction.user.voice.channel
@@ -240,226 +292,51 @@ async def play(
             f"❌ Lỗi:\n{e}",
             ephemeral=True
         )
+
         return
 
     if interaction.guild.id not in queues:
+
         queues[interaction.guild.id] = []
 
     queues[interaction.guild.id].append(data)
 
-    if not vc.is_playing() and not vc.is_paused():
+    if not vc.is_playing():
 
-        first_song = queues[
+        await play_next(
             interaction.guild.id
-        ][0]
-
-        def after(error):
-
-            fut = play_next(
-                interaction.guild.id
-            )
-
-            asyncio.run_coroutine_threadsafe(
-                fut,
-                bot.loop
-            )
-
-        source = discord.PCMVolumeTransformer(
-            discord.FFmpegPCMAudio(
-                first_song["url"],
-                **FFMPEG_OPTIONS
-            ),
-            volume=0.8
         )
-
-        vc.play(
-            source,
-            after=after
-        )
-
-    volume_now = 80
-
-    volume_bar = "▰▰▰▰▱▱▱▱▱▱"
 
     embed = discord.Embed(
         title="🎧 FAT SHARK MUSIC",
         description=f"""
+▶️ NOW PLAYING
 
-NOW PLAYING
-{data['title']}
-
-⏱️ 01:24 / 03:45
-
-{volume_bar}
-
-▶ PLAYING...
-````
-
-""",
-color=0x5865F2
-)
-
-embed.set_image(
-    url="https://i.imgur.com/8Km9tLL.gif"
-)
-
-embed.add_field(
-    name="🔊 Volume",
-    value=f"{volume_now}%",
-    inline=True
-)
-
-embed.add_field(
-    name="🎵 Queue",
-    value=f"`{len(queues[interaction.guild.id])}` songs",
-    inline=True
-)
-
-embed.add_field(
-    name="👥 Listening",
-    value=f"`{len(voice_channel.members)-1}` users",
-    inline=True
-)
-
-embed.set_footer(
-    text="💜 FAT SHARK MUSIC • CHILL VIBES ONLY"
-)
-
-await interaction.followup.send(
-    embed=embed,
-    view=MusicControls(
-        vc,
-        interaction.guild.id,
-        data["title"]
-    )
-)
-
-@bot.tree.command(
-name="volume",
-description="Chỉnh volume"
-)
-@app_commands.describe(
-amount="1-200"
-)
-async def queue(
-    interaction: discord.Interaction
-):
-    await interaction.response.send_message("Queue")
-```
-vc = interaction.guild.voice_client
-
-if not vc:
-
-    await interaction.response.send_message(
-        "❌ Bot chưa vào voice",
-        ephemeral=True
-    )
-    return
-
-if amount < 1 or amount > 200:
-
-    await interaction.response.send_message(
-        "❌ Volume chỉ từ 1-200",
-        ephemeral=True
-    )
-    return
-
-volume_value = amount / 100
-
-if hasattr(vc.source, "volume"):
-    vc.source.volume = volume_value
-
-bar_count = int(amount / 20)
-
-volume_bar = (
-    "▰" * bar_count +
-    "▱" * (10 - bar_count)
-)
-
-embed = discord.Embed(
-    title="🔊 FAT SHARK VOLUME",
-    description=f"""
-```
-
-## {amount}%
-
-{volume_bar}
-""",
-color=0x5865F2
-)
-
-```
-embed.set_footer(
-    text="💜 FAT SHARK MUSIC"
-)
-
-await interaction.response.send_message(
-    embed=embed,
-    ephemeral=True
-)
-```
-
-@bot.tree.command(
-    name="volume",
-    description="Chỉnh volume"
-)
-@app_commands.describe(
-    amount="1-200"
-)
-async def volume(
-    interaction: discord.Interaction,
-    amount: int
-):
-
-    vc = interaction.guild.voice_client
-
-    if not vc:
-
-        await interaction.response.send_message(
-            "❌ Bot chưa vào voice",
-            ephemeral=True
-        )
-        return
-
-    if amount < 1 or amount > 200:
-
-        await interaction.response.send_message(
-            "❌ Volume chỉ từ 1-200",
-            ephemeral=True
-        )
-        return
-
-    volume_value = amount / 100
-
-    if hasattr(vc.source, "volume"):
-        vc.source.volume = volume_value
-
-    bar_count = int(amount / 20)
-
-    volume_bar = (
-        "▰" * bar_count +
-        "▱" * (10 - bar_count)
-    )
-
-    embed = discord.Embed(
-        title="🔊 FAT SHARK VOLUME",
-        description=f"""
-
-## {amount}%
-
-{volume_bar}
-
+🎶 {data['title']}
 """,
         color=0x5865F2
     )
 
-    embed.set_footer(
-        text="💜 FAT SHARK MUSIC"
+    embed.set_image(
+        url="https://media.tenor.com/7sk6P7JGifMAAAAd/shark-confused-ahh-meme.gif"
     )
 
-    await interaction.response.send_message(
+    embed.add_field(
+        name="📜 Queue",
+        value=f"{len(queues[interaction.guild.id])} songs",
+        inline=True
+    )
+
+    embed.set_footer(
+        text="💜 FAT SHARK MUSIC • CHILL VIBES ONLY"
+    )
+
+    await interaction.followup.send(
         embed=embed,
-        ephemeral=True
+        view=MusicControls(
+            vc,
+            interaction.guild.id
+        )
     )
 
 
@@ -471,27 +348,35 @@ async def queue(
     interaction: discord.Interaction
 ):
 
-    queue_list = queues.get(
-        interaction.guild.id,
-        []
-    )
-
-    if not queue_list:
+    if interaction.guild.id not in queues:
 
         await interaction.response.send_message(
             "❌ Queue trống",
             ephemeral=True
         )
+
+        return
+
+    if len(queues[interaction.guild.id]) == 0:
+
+        await interaction.response.send_message(
+            "❌ Queue trống",
+            ephemeral=True
+        )
+
         return
 
     text = ""
 
-    for i, song in enumerate(queue_list):
+    for i, song in enumerate(
+        queues[interaction.guild.id],
+        start=1
+    ):
 
-        text += f"{i+1}. {song['title']}\n"
+        text += f"{i}. {song['title']}\n"
 
     embed = discord.Embed(
-        title="📜 Queue",
+        title="📜 Music Queue",
         description=text,
         color=0x5865F2
     )
@@ -503,28 +388,92 @@ async def queue(
 
 
 @bot.tree.command(
-    name="leave",
-    description="Rời voice"
+    name="volume",
+    description="Chỉnh volume"
 )
-async def leave(
-    interaction: discord.Interaction
+@app_commands.describe(
+    volume="1-200"
+)
+async def volume(
+    interaction: discord.Interaction,
+    volume: int
 ):
 
     vc = interaction.guild.voice_client
 
-    if vc:
-
-        await vc.disconnect()
+    if not vc or not vc.source:
 
         await interaction.response.send_message(
-            "👋 Đã rời voice",
+            "❌ Không có nhạc đang phát",
             ephemeral=True
         )
 
-    else:
+        return
+
+    if volume < 1 or volume > 200:
 
         await interaction.response.send_message(
-            "❌ Bot chưa vào voice",
+            "❌ Volume chỉ từ 1-200",
+            ephemeral=True
+        )
+
+        return
+
+    vc.source.volume = volume / 100
+
+    embed = discord.Embed(
+        title="🔊 Volume Changed",
+        description=f"Current Volume: {volume}%",
+        color=0x5865F2
+    )
+
+    await interaction.response.send_message(
+        embed=embed,
+        ephemeral=True
+    )
+
+
+@bot.tree.command(
+    name="resetfat",
+    description="Reset bot"
+)
+async def resetfat(
+    interaction: discord.Interaction
+):
+
+    await interaction.response.defer(
+        ephemeral=True
+    )
+
+    try:
+
+        if interaction.guild.voice_client:
+
+            await interaction.guild.voice_client.disconnect(
+                force=True
+            )
+
+        queues[interaction.guild.id] = []
+
+        embed = discord.Embed(
+            title="🔄 FAT RESET",
+            description="""
+✅ Queue Reset
+✅ Voice Reset
+✅ Fixed Loading
+""",
+            color=0x57F287
+        )
+
+        await interaction.followup.send(
+            embed=embed,
+            ephemeral=True
+        )
+
+    except Exception as e:
+
+        await interaction.followup.send(
+            f"❌ Error:\n{e}",
             ephemeral=True
         )
 
