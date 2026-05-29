@@ -3,8 +3,9 @@ from discord.ext import commands
 from discord import app_commands
 import yt_dlp
 import asyncio
+import os
 
-TOKEN = "MTUwOTcxMDcyOTY4OTgyOTQ5Nw.G0QfYp.pzrkei1DsNiiuZZ0zDRTwf2wFpxHMMBRqb3DHM"
+TOKEN = os.getenv("TOKEN")
 
 intents = discord.Intents.default()
 intents.message_content = True
