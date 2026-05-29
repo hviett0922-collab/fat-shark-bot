@@ -24,7 +24,7 @@ YDL_OPTIONS = {
     "quiet": True,
     "noplaylist": True,
     "extract_flat": False,
-    "cookiefile": "cookies.txt"
+    "cookiefile": "youtube_cookies.txt"
 }
 
 FFMPEG_OPTIONS = {
