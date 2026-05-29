@@ -23,12 +23,8 @@ YDL_OPTIONS = {
     "format": "bestaudio",
     "quiet": True,
     "noplaylist": True,
-    "cookiefile": "youtube_cookies.txt",
-    "extractor_args": {
-        "youtube": {
-            "player_client": ["android"]
-        }
-    }
+    "cookiefile": "www.youtube.com_cookies.txt",
+    "extract_flat": False
 }
 
 FFMPEG_OPTIONS = {
