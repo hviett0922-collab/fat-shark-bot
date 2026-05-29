@@ -20,11 +20,15 @@ bot = commands.Bot(
 queues = {}
 
 YDL_OPTIONS = {
-    "format": "bestaudio/best",
+    "format": "bestaudio",
     "quiet": True,
     "noplaylist": True,
-    "extract_flat": False,
-    "cookiefile": "youtube_cookies.txt"
+    "cookiefile": "youtube_cookies.txt",
+    "extractor_args": {
+        "youtube": {
+            "player_client": ["android"]
+        }
+    }
 }
 
 FFMPEG_OPTIONS = {
